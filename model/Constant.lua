@@ -1,3 +1,6 @@
+-- A convenience module for nngraph, which takes any input and returns a 
+-- constant tensor (const_weights)
+
 local Constant, parent = torch.class('nn.Constant', 'nn.Module')
 
 function Constant:__init( const_weights )
