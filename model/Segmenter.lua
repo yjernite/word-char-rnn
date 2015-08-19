@@ -1,6 +1,8 @@
 --[[
- Soft segmentation unit
+ Soft segmentation unit, which uses dynamic programming to average (or 
+ max) over all possible decompositions
 --]]
+
 require 'nn'
 require 'nngraph'
 require 'Constant'
