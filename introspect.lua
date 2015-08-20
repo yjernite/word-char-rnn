@@ -25,7 +25,7 @@ cmd:text('Perform model introspection')
 cmd:text()
 cmd:text('Options')
 -- data
-cmd:option('-model','final-results/en-large-model.t7', 'model file')
+cmd:option('-model','final-results/en-large-word-model.t7', 'model file')
 cmd:option('-gpuid',0,'which gpu to use. -1 = use CPU')
 cmd:option('-savefile', 'chargrams.tsv', 'save max chargrams to')
 cmd:text()
