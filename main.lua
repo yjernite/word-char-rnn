@@ -95,6 +95,10 @@ end
 TDNN = require 'model.TDNN'
 LSTMTDNN = require 'model.LSTMTDNN'
 HighwayMLP = require 'model.HighwayMLP'
+BoW = require 'model.BoW'
+Segmenter = require 'model.Segmenter'
+Constant = require 'model.Constant'
+
 
 -- some housekeeping
 loadstring('opt.kernels = ' .. opt.kernels)() -- get kernel sizes
@@ -111,7 +115,7 @@ opt.tokens.END = '}' -- end-of-word token
 opt.tokens.ZEROPAD = ' ' -- zero-pad token 
 
 -- create the data loader class
-loader = BatchLoader.create(opt.data_dir, opt.batch_size, opt.seq_length, opt.padding, opt.max_word_l, 5, opt.use_morpho)
+loader = BatchLoader.create(opt.data_dir, opt.batch_size, opt.seq_length, opt.padding, opt.max_word_l, 10, opt.use_morpho)
 print('Word vocab size: ' .. #loader.idx2word .. ', Char vocab size: ' .. #loader.idx2char
 	    .. ', Max word length (incl. padding): ', loader.max_word_l)
 opt.max_word_l = loader.max_word_l
@@ -198,6 +202,7 @@ function get_input(x, x_char, t, prev_states)
     if opt.use_words == 1 then table.insert(u, x[{{},t}]) end
 
     for i = 1, #prev_states do table.insert(u, prev_states[i]) end
+    print('get_input returns ', u)
     return u
 end
 
@@ -342,6 +347,7 @@ for i = 1, iterations do
         -- evaluate loss on validation data
         local val_loss = eval_split(2) -- 2 = validation
         val_losses[#val_losses+1] = val_loss
+        print('validation loss is ', val_loss)
         local savefile = string.format('%s/lm_%s_epoch%.2f_%.2f.t7', opt.checkpoint_dir, opt.savefile, epoch, val_loss)
         print('saving checkpoint to ' .. savefile)
         local checkpoint = {}

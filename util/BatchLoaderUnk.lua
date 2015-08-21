@@ -173,8 +173,16 @@ function BatchLoaderUnk.text_to_tensor(input_files, morpho_file, use_morpho,
                 if factor2idx[factor] == nil then
                    idx2factor[#idx2factor + 1] = factor
                    factor2idx[factor] = #idx2factor
-                end
-                morpho_dict[wordidx][n] = factor2idx[factor]
+                end 
+                --[[
+                print(factor)
+                print(factor2idx[factor])
+                print(n)
+                print(idx2word[#idx2word])
+                print(wordidx)
+                print(morpho_dict[wordidx])
+                morpho_dict[wordidx][n] = factor2idx[factor] 
+                ]]--
              end
              n = n + 1
           end

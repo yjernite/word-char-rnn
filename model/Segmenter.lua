@@ -3,10 +3,6 @@
  max) over all possible decompositions
 --]]
 
-require 'nn'
-require 'nngraph'
-require 'Constant'
-
 local Segmenter = {}
 
 function Segmenter.segnet(length, input_size, batch_size, max_window, conv_dim, mode)
