@@ -96,12 +96,9 @@ TDNN = require 'model.TDNN'
 LSTMTDNN = require 'model.LSTMTDNN'
 HighwayMLP = require 'model.HighwayMLP'
 BoW = require 'model.BoW'
-<<<<<<< HEAD
 Segmenter = require 'model.Segmenter'
 Constant = require 'model.Constant'
 
-=======
->>>>>>> srush/morpho
 
 -- some housekeeping
 loadstring('opt.kernels = ' .. opt.kernels)() -- get kernel sizes
@@ -118,7 +115,7 @@ opt.tokens.END = '}' -- end-of-word token
 opt.tokens.ZEROPAD = ' ' -- zero-pad token 
 
 -- create the data loader class
-loader = BatchLoader.create(opt.data_dir, opt.batch_size, opt.seq_length, opt.padding, opt.max_word_l, 15, opt.use_morpho)
+loader = BatchLoader.create(opt.data_dir, opt.batch_size, opt.seq_length, opt.padding, opt.max_word_l, 1, opt.use_morpho)
 print('Word vocab size: ' .. #loader.idx2word .. ', Char vocab size: ' .. #loader.idx2char
 	    .. ', Max word length (incl. padding): ', loader.max_word_l)
 opt.max_word_l = loader.max_word_l
