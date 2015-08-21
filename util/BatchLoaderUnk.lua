@@ -158,32 +158,24 @@ function BatchLoaderUnk.text_to_tensor(input_files, morpho_file, use_morpho,
     if use_morpho then 
        f = io.open(morpho_file, 'r')
        for line in f:lines() do
-          local n = 0
+          local n = 1
           for factor in line:gmatch'([^%s]+)' do
              local word = nil
-             if n == 0 then
+             if n == 1 then
                 word = factor
+
                 if word2idx[word] == nil then
-                idx2word[#idx2word + 1] = word
-                word2idx[word] = #idx2word
+                   idx2word[#idx2word + 1] = word
+                   word2idx[word] = #idx2word
                 end
                 wordidx = word2idx[word]
                 morpho_dict[wordidx] = torch.ones(max_factor_l)
-             else
-                if factor2idx[factor] == nil then
-                   idx2factor[#idx2factor + 1] = factor
-                   factor2idx[factor] = #idx2factor
-                end 
-                --[[
-                print(factor)
-                print(factor2idx[factor])
-                print(n)
-                print(idx2word[#idx2word])
-                print(wordidx)
-                print(morpho_dict[wordidx])
-                morpho_dict[wordidx][n] = factor2idx[factor] 
-                ]]--
              end
+             if factor2idx[factor] == nil then
+                idx2factor[#idx2factor + 1] = factor
+                factor2idx[factor] = #idx2factor
+             end
+             morpho_dict[wordidx][n] = factor2idx[factor]
              n = n + 1
           end
        end
@@ -254,8 +246,13 @@ function BatchLoaderUnk.text_to_tensor(input_files, morpho_file, use_morpho,
                    output_tensors[split][word_num] = word2idx[word]
                    if use_morpho then 
                       if morpho_dict[word2idx[word]] == nil then 
-                         print("no morpho for:", word)
+                         -- Just embed word.
                          output_morphos[split][word_num] = torch.ones(max_factor_l)
+                         if factor2idx[word] == nil then
+                            idx2factor[#idx2factor + 1] = word
+                            factor2idx[word] = #idx2factor
+                         end
+                         output_morphos[split][word_num][1] = factor2idx[word]
                       else
                          output_morphos[split][word_num] = morpho_dict[word2idx[word]]
                       end
@@ -283,7 +280,6 @@ function BatchLoaderUnk.text_to_tensor(input_files, morpho_file, use_morpho,
 	  end
        end
     end
-    print "done"
     -- save output preprocessed files
     print('saving ' .. out_vocabfile)
     torch.save(out_vocabfile, {idx2word, word2idx, idx2char, char2idx, idx2factor, factor2idx})
