@@ -155,7 +155,7 @@ function BatchLoaderUnk.text_to_tensor(input_files, morpho_file, use_morpho,
     local split_counts = {}
     local morpho_dict = {}
 
-    if use_morpho then 
+    if  use_morpho then 
        f = io.open(morpho_file, 'r')
        for line in f:lines() do
           local n = 1
