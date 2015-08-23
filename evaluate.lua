@@ -38,7 +38,7 @@ if opt2.gpuid >= 0 then
     cutorch.setDevice(opt2.gpuid + 1)
 end
 
-if opt.cudnn == 1 then
+if opt2.cudnn == 1 then
     assert(opt2.gpuid >= 0, 'GPU must be used if using cudnn')
     print('using cudnn')
     require 'cudnn'
