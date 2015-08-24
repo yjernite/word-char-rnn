@@ -67,48 +67,48 @@ function BatchLoaderUnk.create(data_dir, batch_size, seq_length, padding,
        end
 
         local data_morpho
-        if use_morpho then
+        if use_morpho == 1 then
             data_morpho = torch.ones(data:size(1), max_factor_l):long()
             for i = 1, data:size(1) do
                 data_morpho[i] = all_data_morpho[split][i]
             end
-        elseif use_segmenter then
+        elseif use_segmenter == 1 then
             data_morpho = torch.ones(data:size(1), self.max_word_l, max_window):long()
             for i = 1, data:size(1) do
                 data_morpho[i] = all_data_morpho[split][i]
             end
         end
 
-       if split < 3 then
-          x_batches = data:view(batch_size, -1):split(seq_length, 2)
-          y_batches = ydata:view(batch_size, -1):split(seq_length, 2)
-          x_char_batches = data_char:view(batch_size, -1, self.max_word_l):split(seq_length,2)
-          if use_morpho then
-             x_morpho_batches = data_morpho:view(batch_size, -1, max_factor_l):split(seq_length,2)
-          elseif use_segmenter then
-             x_morpho_batches = data_morpho:view(batch_size, -1, max_word_l, max_window):split(seq_length,2)
-          end
-          nbatches = #x_batches	   
-          self.split_sizes[split] = nbatches
-          assert(#x_batches == #y_batches)
-          assert(#x_batches == #x_char_batches)
-       else --for test we repeat dimensions to batch size (easier but inefficient evaluation)
-          x_batches = {data:resize(1, data:size(1)):expand(batch_size, data:size(2))}
-          y_batches = {ydata:resize(1, ydata:size(1)):expand(batch_size, ydata:size(2))}
-          data_char = data_char:resize(1, data_char:size(1), data_char:size(2))
-          if use_morpho then
-             data_morpho = data_morpho:resize(1, data_morpho:size(1), data_morpho:size(2))
-             x_morpho_batches = {data_morpho:expand(batch_size, data_morpho:size(2), data_morpho:size(3))}
-          end
-          x_char_batches = {data_char:expand(batch_size, data_char:size(2), data_char:size(3))}
+        if split < 3 then
+            x_batches = data:view(batch_size, -1):split(seq_length, 2)
+            y_batches = ydata:view(batch_size, -1):split(seq_length, 2)
+            x_char_batches = data_char:view(batch_size, -1, self.max_word_l):split(seq_length,2)
+            if use_morpho == 1 then
+                x_morpho_batches = data_morpho:view(batch_size, -1, max_factor_l):split(seq_length,2)
+            elseif use_segmenter == 1 then
+                x_morpho_batches = data_morpho:view(batch_size, -1, self.max_word_l, max_window):split(seq_length,2)
+            end
+            nbatches = #x_batches	   
+            self.split_sizes[split] = nbatches
+            assert(#x_batches == #y_batches)
+            assert(#x_batches == #x_char_batches)
+        else --for test we repeat dimensions to batch size (easier but inefficient evaluation)
+            x_batches = {data:resize(1, data:size(1)):expand(batch_size, data:size(2))}
+            y_batches = {ydata:resize(1, ydata:size(1)):expand(batch_size, ydata:size(2))}
+            data_char = data_char:resize(1, data_char:size(1), data_char:size(2))
+            if use_morpho == 1 then
+                data_morpho = data_morpho:resize(1, data_morpho:size(1), data_morpho:size(2))
+                x_morpho_batches = {data_morpho:expand(batch_size, data_morpho:size(2), data_morpho:size(3))}
+            end
+            x_char_batches = {data_char:expand(batch_size, data_char:size(2), data_char:size(3))}
 
-          self.split_sizes[split] = 1
-       end
-       if use_morpho or use_segmenter then 
-          self.all_batches[split] = {x_batches, y_batches, x_morpho_batches}
-       else
-          self.all_batches[split] = {x_batches, y_batches, x_char_batches}
-       end
+            self.split_sizes[split] = 1
+        end
+        if use_morpho == 1 or use_segmenter == 1 then 
+            self.all_batches[split] = {x_batches, y_batches, x_morpho_batches}
+        else
+            self.all_batches[split] = {x_batches, y_batches, x_char_batches}
+        end
     end
     self.batch_idx = {0,0,0}
     print(string.format('data load done. Number of batches in train: %d, val: %d, test: %d', self.split_sizes[1], self.split_sizes[2], self.split_sizes[3]))
@@ -164,7 +164,7 @@ function BatchLoaderUnk.text_to_tensor(input_files, morpho_file, use_morpho, use
     local split_counts = {}
     local morpho_dict = {}
 
-    if use_morpho then
+    if use_morpho == 1 then
         print('using morpho')
        f = io.open(morpho_file, 'r')
        for line in f:lines() do
@@ -188,7 +188,7 @@ function BatchLoaderUnk.text_to_tensor(input_files, morpho_file, use_morpho, use
              n = n + 1
           end
        end
-    elseif use_segmenter then
+    elseif use_segmenter == 1 then
         print('segmenter')
         f = io.open(morpho_file, 'r')
         for line in f:lines() do
@@ -247,7 +247,7 @@ function BatchLoaderUnk.text_to_tensor(input_files, morpho_file, use_morpho, use
 
     -- if actual max word length is less than the limit, use that
     max_word_l = math.min(max_word_l_tmp, max_word_l)
-    if use_segmenter then
+    if use_segmenter == 1 then
         max_word_l = max_word_l + 2
         for i = 1, #morpho_dict do
             morpho_dict[i] = morpho_dict[i]:narrow(1,1,max_word_l)
@@ -259,9 +259,9 @@ function BatchLoaderUnk.text_to_tensor(input_files, morpho_file, use_morpho, use
         -- Watch out the second one needs a lot of RAM.
         output_tensors[split] = torch.LongTensor(split_counts[split])
         output_chars[split] = torch.ones(split_counts[split], max_word_l):long()
-        if use_morpho then 
+        if use_morpho == 1 then 
             output_morphos[split] = torch.ones(split_counts[split], max_factor_l):long()
-        elseif use_segmenter then
+        elseif use_segmenter == 1 then
             output_morphos[split] = torch.ones(split_counts[split], max_word_l, max_window):long()
             print('output_morphos split size ',split, output_morphos[split]:size())
         end
@@ -282,7 +282,7 @@ function BatchLoaderUnk.text_to_tensor(input_files, morpho_file, use_morpho, use
                     if string.sub(word,1,1) == tokens.UNK and word:len() > 1 then -- unk token with character info available
                         word = string.sub(word, 3)
                         output_tensors[split][word_num] = word2idx[tokens.UNK]
-                        if use_morpho or use_segmenter then 
+                        if use_morpho == 1 or use_segmenter == 1 then 
                             output_morphos[split][word_num] = morpho_dict[word2idx[tokens.UNK]]
                         end
                     else
@@ -291,7 +291,7 @@ function BatchLoaderUnk.text_to_tensor(input_files, morpho_file, use_morpho, use
                             word2idx[word] = #idx2word
                         end
                         output_tensors[split][word_num] = word2idx[word]
-                        if use_morpho then 
+                        if use_morpho == 1 then 
                             if morpho_dict[word2idx[word]] == nil then 
                                 -- Just embed word.
                                 output_morphos[split][word_num] = torch.ones(max_factor_l)
@@ -303,7 +303,7 @@ function BatchLoaderUnk.text_to_tensor(input_files, morpho_file, use_morpho, use
                             else
                                 output_morphos[split][word_num] = morpho_dict[word2idx[word]]
                             end
-                        elseif use_segmenter then
+                        elseif use_segmenter == 1 then
                             if morpho_dict[word2idx[word]] == nil then
                                 word_bis = '{'..word..'}'
                                 morpho_dict[word2idx[word]] = torch.ones(max_word_l, max_window)
@@ -361,3 +361,29 @@ end
 
 return BatchLoaderUnk
 
+--[[
+Testing:
+if true then
+    data_dir = 'data/ptb'
+    
+    opt = {}
+    opt.tokens = {}
+    opt.tokens.EOS = '+'
+    opt.tokens.UNK = '|' -- unk word token
+    opt.tokens.START = '{' -- start-of-word token
+    opt.tokens.END = '}' -- end-of-word token
+    opt.tokens.ZEROPAD = ' ' -- zero-pad token 
+    
+    batch_size = 20
+    seq_length = 35
+    padding = 0
+    
+    max_word_l = 50 
+    max_factor_l = 10 
+    max_window = 5
+    
+    use_morpho = 0
+    use_segmenter = 1
+end
+
+]]--

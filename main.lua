@@ -116,9 +116,11 @@ opt.tokens.START = '{' -- start-of-word token
 opt.tokens.END = '}' -- end-of-word token
 opt.tokens.ZEROPAD = ' ' -- zero-pad token 
 
+
 -- create the data loader class
-loader = BatchLoader.create(opt.data_dir, opt.batch_size, opt.seq_length, opt.padding, opt.max_word_l,
-                            opt.max_factor_l, opt.use_morpho)
+loader = BatchLoader.create(opt.data_dir, opt.batch_size, opt.seq_length, opt.padding, 
+                                    opt.max_word_l, opt.max_factor_l, opt.max_window,
+                                    opt.use_morpho, opt.use_segmenter)
 
 print('Word vocab size: ' .. #loader.idx2word .. ', Char vocab size: ' .. #loader.idx2char
 	    .. ', Max word length (incl. padding): ', loader.max_word_l)
@@ -219,7 +221,7 @@ function eval_split(split_idx, max_batches)
     print('evaluating loss over split index ' .. split_idx)
     local n = loader.split_sizes[split_idx]
     if max_batches ~= nil then n = math.min(max_batches, n) end
-
+    
     loader:reset_batch_pointer(split_idx) -- move batch iteration pointer for this split to front
     local loss = 0
     local rnn_state = {[0] = init_state}    
@@ -341,6 +343,10 @@ function feval(x)
 
     return torch.exp(loss)
 end
+
+test_perp = eval_split(3)
+print('Perplexity on test set: ' .. test_perp)
+
 
 -- start optimization here
 train_losses = {}
