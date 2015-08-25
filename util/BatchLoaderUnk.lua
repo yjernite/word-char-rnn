@@ -29,9 +29,10 @@ function BatchLoaderUnk.create(data_dir, batch_size, seq_length, padding,
     -- construct a tensor with all the data
     if not (path.exists(vocab_file) or path.exists(tensor_file) or path.exists(char_file)) then
         print('one-time setup: preprocessing input train/valid/test files in dir: ' .. data_dir)
-        BatchLoaderUnk.text_to_tensor(input_files, in_morpho_file, use_morpho, use_segmenter, vocab_file, tensor_file, char_file, 
-                                      out_morpho_file,
-                                      max_word_l, max_factor_l, max_window)
+        BatchLoaderUnk.text_to_tensor(input_files, in_morpho_file, use_morpho, use_segmenter, 
+                                      vocab_file, tensor_file, char_file, 
+                                      out_morpho_file, max_word_l, max_factor_l, 
+                                      max_window)
     end
 
     print('loading data files...')
@@ -384,6 +385,62 @@ if true then
     
     use_morpho = 0
     use_segmenter = 1
+    
+    opt.use_words = 0
+    opt.use_chars = 0
+    opt.use_morpho = 0
+    opt.use_segmenter = 1
+    
+    opt.rnn_size = 100
+    opt.num_layers = 2
+    opt.dropout = 0.5
+    
+    opt.morpho_vec_size = 50
+    
+    opt.batch_norm = 0
+    opt.batch_size = 20
 end
+
+Loader = require 'util.BatchLoaderUnk'
+
+loader = Loader.create(data_dir, batch_size, seq_length, padding, 
+                                    max_word_l, max_factor_l, max_window,
+                                    use_morpho, use_segmenter)
+
+x, y, x_morph = loader:next_batch(1)
+
+nn = require 'nn'
+require 'nngraph'
+
+Constant = require 'model.Constant'
+Segmenter = require 'model.Segmenter'
+
+batch = x_morph[{{},5}]
+morpho_vec_size = 50
+morpho_vec_layer = nn.LookupTable(#loader.idx2morpho, morpho_vec_size)
+
+inputs = nn.Identity()()
+flatten = nn.View(batch_size * loader.max_word_l, max_window)(inputs)
+morpho_vec = morpho_vec_layer(flatten)
+expanded = nn.View(batch_size, loader.max_word_l, max_window, morpho_vec_size)(morpho_vec)
+
+pre_layer = nn.gModule({inputs}, {expanded})
+vec_batch = pre_layer:forward(batch:contiguous())
+
+segment_1 = Segmenter.segnet(21, 20, max_window, 50, 'mixture', 'rnn')
+
+LSTMTDNN = require 'model.LSTMTDNN'
+
+
+
+proto = LSTMTDNN.lstmtdnn(opt.rnn_size, opt.num_layers, opt.dropout,
+                                  #loader.idx2word, opt.word_vec_size,
+                                  #loader.idx2char, opt.char_vec_size, 
+                                  #loader.idx2morpho, opt.morpho_vec_size, 
+                                  opt.feature_maps, 
+                                  opt.kernels, loader.max_word_l,
+                                  opt.use_words, opt.use_chars, opt.use_morpho, 
+                                  opt.batch_norm, opt.highway_layers, 
+                                  opt.use_segmenter, opt.batch_size, max_window, 'mixture', 'rnn')
 
 ]]--

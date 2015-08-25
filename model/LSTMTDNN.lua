@@ -8,7 +8,8 @@ else
 end
 
 function LSTMTDNN.lstmtdnn(rnn_size, n, dropout, word_vocab_size, word_vec_size, char_vocab_size, char_vec_size, morpho_vocab_size, morpho_vec_size, 
-	 			     feature_maps, kernels, length, use_words, use_chars, use_morpho, batch_norm, highway_layers)
+	 			     feature_maps, kernels, length, use_words, use_chars, use_morpho, batch_norm, highway_layers,
+                     use_segmenter, batch_size, max_window, mode, net_type)
     -- rnn_size = dimensionality of hidden layers
     -- n = number of layers
     -- dropout = dropout probability
@@ -40,7 +41,7 @@ function LSTMTDNN.lstmtdnn(rnn_size, n, dropout, word_vocab_size, word_vec_size,
         word_vec_layer = LookupTable(word_vocab_size, word_vec_size)
         word_vec_layer.name = 'word_vecs' -- change name so we can refer to it easily later
     end
-    if use_morpho == 1 then
+    if use_morpho == 1 or use_segmenter == 1 then
         table.insert(inputs, nn.Identity()()) -- batch_size x 1 (word indices)
         morpho_vec_layer = LookupTable(morpho_vocab_size, morpho_vec_size)
         morpho_vec_layer.name = 'morpho_vecs' -- change name so we can refer to it easily later
@@ -52,8 +53,8 @@ function LSTMTDNN.lstmtdnn(rnn_size, n, dropout, word_vocab_size, word_vec_size,
     local outputs = {}
     for L = 1,n do
        -- c,h from previous timesteps. offsets depend on if we are using both word/chars
-       local prev_h = inputs[L*2+use_words+use_chars+use_morpho]
-       local prev_c = inputs[L*2+use_words+use_chars+use_morpho-1]
+       local prev_h = inputs[L*2+use_words+use_chars+use_morpho+use_segmenter]
+       local prev_c = inputs[L*2+use_words+use_chars+use_morpho+use_segmenter-1]
        -- the input to this layer
        if L == 1 then
           if use_chars == 1 then
@@ -70,12 +71,24 @@ function LSTMTDNN.lstmtdnn(rnn_size, n, dropout, word_vocab_size, word_vec_size,
              x = nn.Identity()(cnn_output)
              end
           elseif use_morpho == 1 then
-             morpho_vec = morpho_vec_layer(inputs[1])
+             local morpho_vec = morpho_vec_layer(inputs[1])
              local morpho_bow = BoW.bow(length, morpho_vec_size)
              morpho_bow.name = 'morpho bow' -- change name so we can refer to it later
              local morpho_output = morpho_bow(morpho_vec)
              x = nn.Identity()(morpho_output)
              input_size_L = morpho_vec_size
+          elseif use_segmenter == 1 then
+             --print(inputs)
+             local flatten = nn.View(batch_size * length, max_window)(inputs[1])
+             local morpho_vec = morpho_vec_layer(flatten)
+             local expanded = nn.View(batch_size, length, max_window, morpho_vec_size)(morpho_vec)
+             local morpho_seg = Segmenter.segnet(length, batch_size, max_window, morpho_vec_size, mode, net_type) --TODO
+             morpho_seg.name = 'morpho seg' -- change name so we can refer to it later
+             local morpho_output = morpho_seg(expanded)
+             
+             x = nn.Identity()(morpho_output)
+             input_size_L = morpho_vec_size
+             --print('input layer done')
           else -- word_vecs only
              x = word_vec_layer(inputs[1])
              input_size_L = word_vec_size

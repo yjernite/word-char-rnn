@@ -5,32 +5,21 @@
 
 local Segmenter = {}
 
-function Segmenter.segnet(length, input_size, batch_size, max_window, conv_dim, mode, type)
+function Segmenter.segnet(length, batch_size, max_window, conv_dim, mode, net_type)
    -- length = length of sentences/words (zero padded to be of same length)
    -- input_size = character embedding_size
    -- max_window = window size
    -- conv_dim = RNN state size
    -- mode in {'max', 'mixture'}
-   -- type in {'lstm', 'rnn'}
-   print('params', length, input_size, batch_size, max_window, conv_dim, mode)
+   -- net_type in {'lstm', 'rnn'}
+   print('params', length, batch_size, max_window, conv_dim, mode, net_type)
    
-   -- first, define the convolution layer to treat  char-grams
-   local input = nn.Identity()() -- input is batch_size x length x input_size
-   local reduced_l = length - max_window +  1
-   local convos = {}
-   for i = 1, max_window do
-      local conv = nn.TemporalConvolution(input_size, conv_dim, i)
-      conv.name = 'conv_filter_' .. i .. '_' .. conv_dim
-      local conv_layer = conv(input)
-      local off_conv = nn.Narrow(2, max_window + 1 - i, reduced_l)(conv_layer)
-      table.insert(convos, nn.View(batch_size, reduced_l, 1, conv_dim)(off_conv))
-   end
-   local all_convs = nn.JoinTable(3)(convos) -- output is batch_size x reduced_l x max_window x conv_dim
+   local all_convs = nn.Identity()()
    
    -- then, define the recurrent units
    local units = {}
    local output
-   if type == 'lstm' then -- LSTM version
+   if net_type == 'lstm' then -- LSTM version
       -- output is {h: batch_size x 1 x conv_dim, c: batch_size x 1 x  conv_dim}
       -- padding units
       for i = 1, max_window do
@@ -40,11 +29,11 @@ function Segmenter.segnet(length, input_size, batch_size, max_window, conv_dim, 
       end
       -- recurrent "dynamic" network
       for i = max_window+1, length do
-        print('unit ',i)
+        --print('unit ',i)
         local pre_h = {}
         local pre_c = {}
         for j = 1, max_window do
-          print('input ',i-j)
+          --print('input ',i-j)
           table.insert(pre_h, units[i-j][1])
           table.insert(pre_c, units[i-j][2])
         end
@@ -100,17 +89,17 @@ function Segmenter.segnet(length, input_size, batch_size, max_window, conv_dim, 
         end
       end
       output = nn.View(batch_size, conv_dim)(units[length][1])
-   else                   -- Linear RNN version
+   elseif net_type == 'rnn' then -- Linear RNN version
       -- padding units
       for i = 1, max_window do
         local padd_h = nn.Constant(torch.Tensor(batch_size, 1, conv_dim):zero())
         table.insert(units, padd_h(all_convs))
       end
       for i = max_window+1, length do
-        print('unit ',i)
+        -- print('unit ',i)
         local pre_h = {}
         for j = 1, max_window do
-          print('input ',i-j)
+          --  print('input ',i-j)
           table.insert(pre_h, units[i-j])
         end
         local prev_h = nn.JoinTable(2)(pre_h)    -- batch_size * max_window * conv_dim
@@ -142,7 +131,7 @@ function Segmenter.segnet(length, input_size, batch_size, max_window, conv_dim, 
    end
    
    
-   return nn.gModule({input}, {output})
+   return nn.gModule({all_convs}, {output})
 end
 
 return Segmenter

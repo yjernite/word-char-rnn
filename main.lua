@@ -151,7 +151,7 @@ else
                                   opt.feature_maps, 
                                   opt.kernels, loader.max_word_l,
                                   opt.use_words, opt.use_chars, opt.use_morpho, 
-                                  opt.batch_norm, opt.highway_layers)
+                                  opt.batch_norm, opt.highway_layers, opt.use_segmenter)
     -- training criterion (negative log likelihood)
     protos.criterion = nn.ClassNLLCriterion()
 end
@@ -211,7 +211,7 @@ function get_input(x, x_char, t, prev_states)
     local u = {}
     if opt.use_chars == 1 or opt.use_morpho == 1 then table.insert(u, x_char[{{},t}]) end
     if opt.use_words == 1 then table.insert(u, x[{{},t}]) end
-
+    
     for i = 1, #prev_states do table.insert(u, prev_states[i]) end
     return u
 end
@@ -226,48 +226,47 @@ function eval_split(split_idx, max_batches)
     local loss = 0
     local rnn_state = {[0] = init_state}    
     if split_idx<=2 then -- batch eval        
-	for i = 1,n do -- iterate over batches in the split
-	    -- fetch a batch
-	    local x, y, x_char = loader:next_batch(split_idx)
-	    if opt.gpuid >= 0 then -- ship the input arrays to GPU
-		-- have to convert to float because integers can't be cuda()'d
-		x = x:float():cuda()
-		y = y:float():cuda()
-		x_char = x_char:float():cuda()
-	    end
-	    -- forward pass
-	    for t=1,opt.seq_length do
-		clones.rnn[t]:evaluate() -- for dropout proper functioning
-		local lst = clones.rnn[t]:forward(get_input(x, x_char, t, rnn_state[t-1]))
-		rnn_state[t] = {}
-		for i=1,#init_state do table.insert(rnn_state[t], lst[i]) end
-		prediction = lst[#lst] 
-		loss = loss + clones.criterion[t]:forward(prediction, y[{{}, t}])
-	    end
-	    -- carry over lstm state
-	    rnn_state[0] = rnn_state[#rnn_state]
-	    -- print(i .. '/' .. n .. '...')
-	end
-	loss = loss / opt.seq_length / n
+    for i = 1,n do -- iterate over batches in the split
+        -- fetch a batch
+        local x, y, x_char = loader:next_batch(split_idx)
+        if opt.gpuid >= 0 then -- ship the input arrays to GPU
+        -- have to convert to float because integers can't be cuda()'d
+        x = x:float():cuda()
+        y = y:float():cuda()
+        x_char = x_char:float():cuda()
+        end
+        -- forward pass
+        for t=1,opt.seq_length do
+        clones.rnn[t]:evaluate() -- for dropout proper functioning
+        local lst = clones.rnn[t]:forward(get_input(x, x_char, t, rnn_state[t-1]))
+        rnn_state[t] = {}
+        for i=1,#init_state do table.insert(rnn_state[t], lst[i]) end
+        prediction = lst[#lst] 
+        loss = loss + clones.criterion[t]:forward(prediction, y[{{}, t}])
+        end
+        -- carry over lstm state
+        rnn_state[0] = rnn_state[#rnn_state]
+        -- print(i .. '/' .. n .. '...')
+    end
+    loss = loss / opt.seq_length / n
     else -- full eval on test set
         local x, y, x_char = loader:next_batch(split_idx)
-	if opt.gpuid >= 0 then -- ship the input arrays to GPU
-	    -- have to convert to float because integers can't be cuda()'d
-	    x = x:float():cuda()
-	    y = y:float():cuda()
-	    x_char = x_char:float():cuda()
-	end
-	protos.rnn:evaluate() -- just need one clone
-	for t = 1, x:size(2) do
-
-	    local lst = protos.rnn:forward(get_input(x, x_char, t, rnn_state[0]))
-	    rnn_state[0] = {}
-	    for i=1,#init_state do table.insert(rnn_state[0], lst[i]) end
-	    prediction = lst[#lst] 
-	    local tok_perp = protos.criterion:forward(prediction, y[{{},t}])
-	    loss = loss + tok_perp
-	end
-	loss = loss / x:size(2)
+    if opt.gpuid >= 0 then -- ship the input arrays to GPU
+        -- have to convert to float because integers can't be cuda()'d
+        x = x:float():cuda()
+        y = y:float():cuda()
+        x_char = x_char:float():cuda()
+    end
+    protos.rnn:evaluate() -- just need one clone
+    for t = 1, x:size(2) do
+        local lst = protos.rnn:forward(get_input(x, x_char, t, rnn_state[0]))
+        rnn_state[0] = {}
+        for i=1,#init_state do table.insert(rnn_state[0], lst[i]) end
+        prediction = lst[#lst] 
+        local tok_perp = protos.criterion:forward(prediction, y[{{},t}])
+        loss = loss + tok_perp
+    end
+    loss = loss / x:size(2)
     end    
     local perp = torch.exp(loss)    
     return perp
