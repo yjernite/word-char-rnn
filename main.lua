@@ -343,9 +343,6 @@ function feval(x)
     return torch.exp(loss)
 end
 
-test_perp = eval_split(3)
-print('Perplexity on test set: ' .. test_perp)
-
 
 -- start optimization here
 train_losses = {}
