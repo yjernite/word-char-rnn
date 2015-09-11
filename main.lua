@@ -42,6 +42,7 @@ cmd:option('-kernels', '{1,2,3,4,5,6,7}', 'conv net kernel widths')
 cmd:option('-num_layers', 2, 'number of layers in the LSTM')
 cmd:option('-dropout',0.5,'dropout. 0 = no dropout')
 -- optimization
+cmd:option('-hsm',0,'number of clusters to use for hsm. 0 = normal softmax, -1 = use sqrt(|V|)')
 cmd:option('-learning_rate',1,'starting learning rate')
 cmd:option('-learning_rate_decay',0.5,'learning rate decay')
 cmd:option('-decay_when',1,'decay if validation perplexity does not improve by more than this much')
@@ -151,7 +152,8 @@ else
                                   opt.feature_maps, 
                                   opt.kernels, loader.max_word_l,
                                   opt.use_words, opt.use_chars, opt.use_morpho, 
-                                  opt.batch_norm, opt.highway_layers, opt.use_segmenter)
+                                  opt.batch_norm, opt.highway_layers, opt.use_segmenter,
+                                  opt.hsm)
     -- training criterion (negative log likelihood)
     protos.criterion = nn.ClassNLLCriterion()
 end

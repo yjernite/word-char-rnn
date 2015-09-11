@@ -1,5 +1,6 @@
 #!/bin/bash
 
+#download non-english data
 wget https://github.com/bothameister/bothameister.github.io/raw/master/icml14-data.tar.bz2
 tar xf icml14-data.tar.bz2
 

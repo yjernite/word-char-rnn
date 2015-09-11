@@ -1,12 +1,12 @@
 ## Character-Aware Neural Language Models
+Code for the paper [Character-Aware Neural Language Models](http://arxiv.org/abs/1508.06615).
+
 A neural language model (NLM) built on character inputs only. Predictions
 are still made at the word-level. The model employs a convolutional neural network (CNN) over characters 
 to use as inputs into an long short-term memory (LSTM)
 recurrent neural network language model (RNN-LM). Also optionally
 passes the output from the CNN through a [Highway Network](http://arxiv.org/abs/1507.06228), 
 which improves performance.
-
-Note: Paper will be posted on arXiv very soon.
 
 Much of the base code is from Andrej Karpathy's excellent character RNN implementation,
 available at https://github.com/karpathy/char-rnn
@@ -26,11 +26,12 @@ luarocks install cunn
 
 `cudnn` will result in a good (8x-10x) speed-up for convolutions, so it is
 highly recommended. This will make the training time of a character-level model 
-be somewhat competitive against a word-level model (0.5 secs/batch vs 0.25 secs/batch for 
+be somewhat competitive against a word-level model (1500 tokens/sec vs 3000 tokens/sec for 
 the large character/word-level models described below).
 
 ```
 git clone https://github.com/soumith/cudnn.torch.git
+cd cudnn.torch
 luarocks make cudnn-scm-1.rockspec
 ```
 ### Data
@@ -44,7 +45,9 @@ widely used by the language modeling community) is given as the default.
 The paper also runs the models on non-English data (Czech, French, German, Russian, and Spanish), from the ICML 2014
 paper [Compositional Morphology for Word Representations and Language Modelling](http://arxiv.org/abs/1405.4273)
 by Jan Botha and Phil Blunsom. This can be downloaded from [Jan's website](https://bothameister.github.io).
-We also provide a script to download them and save in the relevant folders (see `get_data.sh`).
+
+For ease of use, we provide a script to download the non-English data (`get_data.sh`). 
+The script also saves the downloaded data into the relevant folders.
 
 #### Note on PTB
 The PTB data above does not have end-of-sentence tokens for each sentence, and hence these must be
@@ -52,13 +55,13 @@ manually appended. This can be done by adding `-EOS '+'` to the script (obviousl
 can use other characters than `+` to represent an end-of-sentence token---we recommend a single
 unused character).
 
-Jan's datasets already have end-of-sentence tokens for each line so you do not need to 
+The non-English data already have end-of-sentence tokens for each line so you do not need to 
 add the `-EOS` command (equivalent to adding `-EOS ''`, which is the default).
 
 ### Model
 Here are some example scripts. Add `-gpuid 0` to each line to use a GPU (which is
 required to get any reasonable speed with the CNN), and `-cudnn 1` to use the
-cudnn package. 
+cudnn package. Scripts to reproduce the results of the paper can be found under `run_models.sh`
 
 #### Character-level models
 Large character-level model (LSTM-CharCNN-Large in the paper).
@@ -104,6 +107,18 @@ th evaluate.lua -model model_file.t7 -data_dir data/ptb -savefile model_results.
 Where `model_file.t7` is the path to the best performing (on validation) model.
 This will also save some basic statistics (e.g. perplexity by token) in
 `model_results.t7`.
+
+### Hierarchical Softmax
+Training on a larger vocabulary (e.g. 100K+) will require hierarchical softmax (HSM)
+to train at a reasonable speed. You can use the `-hsm` option to do this.
+For example `-hsm 500` will randomly split the vocabulary into 500 clusters of
+(approximately) equal size. `-hsm 0` is the default and will not use HSM.
+`-hsm -1` will automatically choose the number of clusters for you, by choosing the integer
+closest to sqrt(|V|).
+
+### Batch Size
+If training on bigger datasets you should probably use a 
+larger batch size (e.g. `-batch_size 100`).
 
 ### Licence
 MIT
