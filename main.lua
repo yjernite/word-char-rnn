@@ -127,6 +127,41 @@ print('Word vocab size: ' .. #loader.idx2word .. ', Char vocab size: ' .. #loade
 	    .. ', Max word length (incl. padding): ', loader.max_word_l)
 opt.max_word_l = loader.max_word_l
 
+if opt.hsm == -1 then
+    opt.hsm = torch.round(torch.sqrt(#loader.idx2word))
+end
+
+if opt.hsm > 0 then
+    -- partition into opt.hsm clusters
+    -- we want roughly equal number of words in each cluster
+    HSMClass = require 'util.HSMClass'
+    require 'util.HLogSoftMax'
+    mapping = torch.LongTensor(#loader.idx2word, 2):zero()
+    local n_in_each_cluster = #loader.idx2word / opt.hsm
+    local _, idx = torch.sort(torch.randn(#loader.idx2word), 1, true)   
+    local n_in_cluster = {} --number of tokens in each cluster
+    local c = 1
+    for i = 1, idx:size(1) do
+        local word_idx = idx[i] 
+        if n_in_cluster[c] == nil then
+            n_in_cluster[c] = 1
+        else
+            n_in_cluster[c] = n_in_cluster[c] + 1
+        end
+        mapping[word_idx][1] = c
+        mapping[word_idx][2] = n_in_cluster[c]        
+        if n_in_cluster[c] >= n_in_each_cluster then
+            c = c+1
+        end
+        if c > opt.hsm then --take care of some corner cases
+            c = opt.hsm
+        end
+    end
+    print(string.format('using hierarchical softmax with %d classes', opt.hsm))
+end
+
+
+
 -- make sure output directory exists
 if not path.exists(opt.checkpoint_dir) then lfs.mkdir(opt.checkpoint_dir) end
 
@@ -155,7 +190,11 @@ else
                                   opt.batch_norm, opt.highway_layers, opt.use_segmenter,
                                   opt.hsm)
     -- training criterion (negative log likelihood)
-    protos.criterion = nn.ClassNLLCriterion()
+    if opt.hsm > 0 then
+        protos.criterion = nn.HLogSoftMax(mapping, opt.rnn_size)
+    else
+        protos.criterion = nn.ClassNLLCriterion()
+    end
 end
 
 -- the initial state of the cell/hidden states
@@ -174,6 +213,15 @@ end
 
 -- put the above things into one flattened parameters tensor
 params, grad_params = model_utils.combine_all_parameters(protos.rnn)
+-- hsm has its own params
+if opt.hsm > 0 then
+    hsm_params, hsm_grad_params = protos.criterion:getParameters()
+    hsm_params:uniform(-opt.param_init, opt.param_init)
+    print('number of parameters in the model: ' .. params:nElement() + hsm_params:nElement())
+else
+    print('number of parameters in the model: ' .. params:nElement())
+end
+
 
 -- initialization
 if not retrain then
@@ -222,6 +270,9 @@ end
 function eval_split(split_idx, max_batches)
     print('evaluating loss over split index ' .. split_idx)
     local n = loader.split_sizes[split_idx]
+    if opt.hsm > 0 then
+        protos.criterion:change_bias()
+    end
     if max_batches ~= nil then n = math.min(max_batches, n) end
     
     loader:reset_batch_pointer(split_idx) -- move batch iteration pointer for this split to front
@@ -281,7 +332,9 @@ function feval(x)
         params:copy(x)
     end
     grad_params:zero()
-    
+    if opt.hsm > 0 then
+        hsm_grad_params:zero()
+    end
     ------------------ get minibatch -------------------
     local x, y, x_char = loader:next_batch(1) --from train
     if opt.gpuid >= 0 then -- ship the input arrays to GPU
@@ -332,15 +385,23 @@ function feval(x)
        morpho_vecs.gradWeight[1]:zero()
     end
 
-    local grad_norm = grad_params:norm()
-
+    local grad_norm, shrink_factor
+    if opt.hsm==0 then
+        grad_norm = grad_params:norm()
+    else
+        grad_norm = torch.sqrt(grad_params:norm()^2 + hsm_grad_params:norm()^2)
+    end
     if grad_norm > opt.max_grad_norm then
-        local shrink_factor = opt.max_grad_norm / grad_norm
-	grad_params:mul(shrink_factor)
+        shrink_factor = opt.max_grad_norm / grad_norm
+        grad_params:mul(shrink_factor)
+        if opt.hsm > 0 then
+            hsm_grad_params:mul(shrink_factor)
+        end
     end    
     params:add(grad_params:mul(-lr)) -- update params
-    -- print(loss)
-    -- print("ROUND")
+    if opt.hsm > 0 then
+        hsm_params:add(hsm_grad_params:mul(-lr))
+    end
 
     return torch.exp(loss)
 end
